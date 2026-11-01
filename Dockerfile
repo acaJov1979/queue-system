@@ -1,5 +1,5 @@
-# Node 22 is required for the built-in `node:sqlite` module (added in 22.5).
-FROM node:22-slim
+# Node 24 ships the built-in `node:sqlite` module as stable (no flag needed).
+FROM node:24-slim
 
 WORKDIR /app
 

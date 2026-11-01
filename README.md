@@ -24,7 +24,7 @@ queue live online. No app install required.
 
 ## Getting started
 
-Requires **Node.js 22.5+** (for the built-in `node:sqlite` module).
+Requires **Node.js 24+** (for the stable built-in `node:sqlite` module).
 
 ```bash
 cd queue-app

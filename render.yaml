@@ -9,10 +9,10 @@ services:
     # No dependencies to install (Node built-ins only), so build is a no-op.
     buildCommand: "echo no build needed"
     startCommand: "node src/server.js"
-    # Render requires Node 22.5+ for the built-in node:sqlite module.
+    # Node 24+ ships the built-in node:sqlite module as stable (no flag).
     envVars:
       - key: NODE_VERSION
-        value: "22.11.0"
+        value: "24.0.0"
       - key: NODE_ENV
         value: production
     # Render sets PORT automatically; the app already reads process.env.PORT.
