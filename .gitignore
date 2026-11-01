@@ -4,3 +4,8 @@ data/*.db-journal
 data/*.db-wal
 data/*.db-shm
 .env
+# temp operation logs
+_op.txt
+_check.txt
+_push_result.txt
+_verify.txt
