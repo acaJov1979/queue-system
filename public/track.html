@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Your Number</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <h1 id="qName">Queue</h1>
+    <h2>Live tracking · keep this page open</h2>
+
+    <div class="card center">
+      <p class="muted">Your number</p>
+      <div class="big-number" id="yourNumber">—</div>
+    </div>
+
+    <div class="card center">
+      <p class="muted">Now serving</p>
+      <div class="serving" id="nowServing">—</div>
+    </div>
+
+    <div class="card center" id="statusCard">
+      <div id="statusMsg" class="muted">Loading...</div>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const ticketId = params.get("ticket");
+    const queueId = params.get("queue");
+    const el = (id) => document.getElementById(id);
+
+    let myNumber = null;
+
+    if (!ticketId || !queueId) {
+      document.body.innerHTML = "<div class='wrap'><div class='card'>Invalid tracking link.</div></div>";
+    } else {
+      async function loadTicket() {
+        const res = await fetch(`/api/tickets/${ticketId}`);
+        if (!res.ok) {
+          el("statusMsg").textContent = "Ticket not found.";
+          return;
+        }
+        const t = await res.json();
+        myNumber = t.number;
+        el("qName").textContent = t.queueName || "Queue";
+        el("yourNumber").textContent = t.number;
+        el("nowServing").textContent = t.nowServing > 0 ? t.nowServing : "—";
+        updateStatus(t.status, t.peopleAhead);
+      }
+
+      function updateStatus(status, peopleAhead) {
+        const card = el("statusCard");
+        const msg = el("statusMsg");
+        card.style.background = "";
+        if (status === "serving") {
+          msg.innerHTML = "<strong style='font-size:1.3rem;color:#22c55e'>🔔 It's your turn!</strong>";
+        } else if (status === "done") {
+          msg.textContent = "You have been served. Thank you!";
+        } else if (peopleAhead === 0) {
+          msg.innerHTML = "<strong>You're next!</strong>";
+        } else {
+          msg.innerHTML = `<strong>${peopleAhead}</strong> ${peopleAhead === 1 ? "person" : "people"} ahead of you`;
+        }
+      }
+
+      // Use the queue broadcast to refresh our own ticket status live.
+      function connect() {
+        const proto = location.protocol === "https:" ? "wss" : "ws";
+        const ws = new WebSocket(`${proto}://${location.host}/ws?queue=${queueId}`);
+        ws.onmessage = (ev) => {
+          const msg = JSON.parse(ev.data);
+          if (msg.type === "state" && myNumber !== null) {
+            const state = msg.state;
+            el("nowServing").textContent = state.nowServing > 0 ? state.nowServing : "—";
+            if (state.nowServing === myNumber) {
+              updateStatus("serving", 0);
+            } else if (state.nowServing > myNumber) {
+              updateStatus("done", 0);
+            } else {
+              const ahead = state.waiting.filter((n) => n < myNumber).length;
+              updateStatus("waiting", ahead);
+            }
+          }
+        };
+        ws.onclose = () => setTimeout(connect, 2000);
+      }
+
+      loadTicket();
+      connect();
+    }
+  </script>
+</body>
+</html>

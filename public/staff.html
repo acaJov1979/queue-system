@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Staff Dashboard</title>
+  <link rel="stylesheet" href="/style.css" />
+  <script src="/qrcode.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <h1 id="qName">Queue</h1>
+    <h2>Staff dashboard · <span class="pill open" id="statusPill">open</span></h2>
+
+    <div class="card center">
+      <p class="muted">Now serving</p>
+      <div class="serving" id="nowServing">—</div>
+      <div class="spacer"></div>
+      <button class="block success" id="nextBtn">Call next ▶</button>
+      <div class="spacer"></div>
+      <p class="muted"><span id="waitingCount">0</span> waiting</p>
+    </div>
+
+    <div class="card center">
+      <p class="muted">Customers scan this to join</p>
+      <div class="qr" id="qr"></div>
+      <label>Join link</label>
+      <div class="link-box" id="joinLink"></div>
+    </div>
+
+    <div class="card">
+      <label>Waiting numbers</label>
+      <div class="waiting-list" id="waitingList"></div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <button class="secondary" id="toggleBtn">Close queue</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const queueId = params.get("queue");
+    const token = params.get("token");
+
+    const el = (id) => document.getElementById(id);
+
+    if (!queueId || !token) {
+      document.body.innerHTML = "<div class='wrap'><div class='card'>Missing queue or token. Start a queue from the home page.</div></div>";
+    } else {
+      const base = location.origin;
+      const joinUrl = `${base}/join.html?queue=${queueId}`;
+      el("joinLink").textContent = joinUrl;
+
+      // Render QR code client-side (qrcode-generator, vendored, no deps).
+      try {
+        const qr = qrcode(0, "M"); // type 0 = auto-size, error correction M
+        qr.addData(joinUrl);
+        qr.make();
+        el("qr").innerHTML = qr.createImgTag(5, 8); // cellSize, margin
+      } catch (e) {
+        el("qr").textContent = "Could not render QR code.";
+      }
+
+      function render(state) {
+        if (!state) return;
+        el("qName").textContent = state.name;
+        el("nowServing").textContent = state.nowServing > 0 ? state.nowServing : "—";
+        el("waitingCount").textContent = state.waitingCount;
+        const pill = el("statusPill");
+        pill.textContent = state.status;
+        pill.className = "pill " + state.status;
+        el("toggleBtn").textContent = state.status === "open" ? "Close queue" : "Reopen queue";
+        const list = el("waitingList");
+        list.innerHTML = "";
+        if (state.waiting.length === 0) {
+          list.innerHTML = "<span class='muted'>No one waiting</span>";
+        } else {
+          for (const n of state.waiting) {
+            const d = document.createElement("div");
+            d.className = "num";
+            d.textContent = n;
+            list.appendChild(d);
+          }
+        }
+      }
+
+      async function loadInitial() {
+        const res = await fetch(`/api/queues/${queueId}`);
+        if (res.ok) render(await res.json());
+      }
+
+      // Live updates via WebSocket.
+      function connect() {
+        const proto = location.protocol === "https:" ? "wss" : "ws";
+        const ws = new WebSocket(`${proto}://${location.host}/ws?queue=${queueId}`);
+        ws.onmessage = (ev) => {
+          const msg = JSON.parse(ev.data);
+          if (msg.type === "state") render(msg.state);
+        };
+        ws.onclose = () => setTimeout(connect, 2000);
+      }
+
+      el("nextBtn").addEventListener("click", async () => {
+        const res = await fetch(`/api/queues/${queueId}/next?token=${token}`, { method: "POST" });
+        const data = await res.json();
+        if (data.empty) {
+          // No one waiting; state still broadcasts.
+        }
+      });
+
+      el("toggleBtn").addEventListener("click", async () => {
+        const closing = el("toggleBtn").textContent.startsWith("Close");
+        await fetch(`/api/queues/${queueId}/status?token=${token}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: closing ? "closed" : "open" }),
+        });
+      });
+
+      loadInitial();
+      connect();
+    }
+  </script>
+</body>
+</html>

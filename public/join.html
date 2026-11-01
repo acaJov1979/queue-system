@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Join the Queue</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <h1 id="qName">Queue</h1>
+    <h2>Tap below to get your number</h2>
+
+    <div class="card center" id="joinCard">
+      <p class="muted">Now serving</p>
+      <div class="serving" id="nowServing">—</div>
+      <div class="spacer"></div>
+      <button class="block success" id="joinBtn">Get my number 🎟️</button>
+      <div class="spacer"></div>
+      <p class="muted"><span id="waitingCount">0</span> people waiting</p>
+    </div>
+
+    <div class="card center" id="closedCard" style="display:none">
+      <p class="danger">This queue is currently closed.</p>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const queueId = params.get("queue");
+    const el = (id) => document.getElementById(id);
+
+    if (!queueId) {
+      document.body.innerHTML = "<div class='wrap'><div class='card'>Invalid link. Please scan the QR code again.</div></div>";
+    } else {
+      async function loadState() {
+        const res = await fetch(`/api/queues/${queueId}`);
+        if (!res.ok) {
+          document.body.innerHTML = "<div class='wrap'><div class='card'>Queue not found.</div></div>";
+          return;
+        }
+        const state = await res.json();
+        el("qName").textContent = state.name;
+        el("nowServing").textContent = state.nowServing > 0 ? state.nowServing : "—";
+        el("waitingCount").textContent = state.waitingCount;
+        if (state.status === "closed") {
+          el("joinCard").style.display = "none";
+          el("closedCard").style.display = "block";
+        }
+      }
+
+      el("joinBtn").addEventListener("click", async () => {
+        el("joinBtn").disabled = true;
+        el("joinBtn").textContent = "Getting number...";
+        const res = await fetch(`/api/queues/${queueId}/join`, { method: "POST" });
+        if (res.status === 409) {
+          alert("Sorry, this queue is now closed.");
+          loadState();
+          el("joinBtn").disabled = false;
+          el("joinBtn").textContent = "Get my number 🎟️";
+          return;
+        }
+        if (!res.ok) {
+          alert("Could not join. Please try again.");
+          el("joinBtn").disabled = false;
+          el("joinBtn").textContent = "Get my number 🎟️";
+          return;
+        }
+        const data = await res.json();
+        // Go to the live tracking page for this ticket.
+        location.href = `/track.html?ticket=${data.ticketId}&queue=${queueId}`;
+      });
+
+      loadState();
+    }
+  </script>
+</body>
+</html>

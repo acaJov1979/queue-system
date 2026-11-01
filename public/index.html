@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Start a Queue</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <h1>🎟️ Queue System</h1>
+    <h2>Start a queue whenever you need one</h2>
+
+    <div class="card">
+      <label for="name">Queue name (e.g. "Bakery counter")</label>
+      <input type="text" id="name" placeholder="My Queue" />
+      <div class="spacer"></div>
+      <button class="block" id="createBtn">Start queue</button>
+    </div>
+
+    <div class="card" id="result" style="display:none">
+      <p class="muted">Your queue is live. Open the staff dashboard to show the QR code and call customers.</p>
+      <div class="spacer"></div>
+      <button class="block success" id="openStaff">Open staff dashboard</button>
+      <div class="spacer"></div>
+      <label>Keep this staff link safe (it controls the queue):</label>
+      <div class="link-box" id="staffLink"></div>
+    </div>
+  </div>
+
+  <script>
+    const createBtn = document.getElementById("createBtn");
+    const result = document.getElementById("result");
+    const staffLink = document.getElementById("staffLink");
+    const openStaff = document.getElementById("openStaff");
+    let staffUrl = "";
+
+    createBtn.addEventListener("click", async () => {
+      createBtn.disabled = true;
+      createBtn.textContent = "Starting...";
+      try {
+        const name = document.getElementById("name").value.trim() || "Queue";
+        const res = await fetch("/api/queues", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        });
+        const data = await res.json();
+        staffUrl = data.staffUrl;
+        staffLink.textContent = staffUrl;
+        result.style.display = "block";
+      } catch (e) {
+        alert("Could not start queue. Please try again.");
+      } finally {
+        createBtn.disabled = false;
+        createBtn.textContent = "Start queue";
+      }
+    });
+
+    openStaff.addEventListener("click", () => {
+      if (staffUrl) window.location.href = staffUrl;
+    });
+  </script>
+</body>
+</html>
